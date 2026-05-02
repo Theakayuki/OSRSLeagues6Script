@@ -47,7 +47,7 @@ HttpClient client = new();
 Console.WriteLine("Welcome to the OSRS Leagues 6 points left checker!");
 Console.WriteLine($"Please enter your username(case-sensitive) or press Enter to use previous: {username}");
 
-string input = Console.ReadLine();
+string input = Console.ReadLine() ?? string.Empty;
 
 if (!string.IsNullOrWhiteSpace(input))
 {
@@ -103,19 +103,52 @@ if (leaguesTables == null)
     return;
 }
 
+Console.WriteLine("Enter the number corresponding locations you have unlocked, separated by commas. For example, '1,3,5' for General, Karamja, and Desert.");
+Console.WriteLine($"Or if you have entered locations before and not changed, just press Enter to use previous locations: {(state?.PreviousLocations?.Count > 0 ? string.Join(", ", state.PreviousLocations) : "None")}");
+Console.WriteLine("Available locations:");
+foreach (var location in Enum.GetValues<Locations>())
+{
+    Console.WriteLine($"{(int)location}. {location}");
+}
+
+string locationsInput = Console.ReadLine() ?? string.Empty;
+List<Locations> selectedLocations = new();
+if (string.IsNullOrWhiteSpace(locationsInput) && state?.PreviousLocations != null)
+{
+    selectedLocations = state.PreviousLocations;
+}
+else
+{
+    var locationIds = locationsInput.Split(',').Select(id => id.Trim());
+    foreach (var id in locationIds)
+    {
+        if (int.TryParse(id, out int locationId) && Enum.IsDefined(typeof(Locations), locationId))
+        {
+            selectedLocations.Add((Locations)locationId);
+        }
+        else
+        {
+            Console.WriteLine($"Invalid location ID: {id}. Skipping.");
+        }
+    }
+}
+
 int totalPoints = 0;
 int totalPointsLeft = 0;
 
 foreach (var league in leaguesTables)
 {
-    totalPoints += int.TryParse(league.Points, out int points) ? points : 0;
-    if (playerData.LeagueTasks.Contains(int.TryParse(league.Id, out int taskId) ? taskId : -1))
+    if (selectedLocations.Contains(Enum.Parse<Locations>(league.Area)))
     {
-        totalPointsLeft += int.TryParse(league.Points, out int leftPoints) ? leftPoints : 0;
+        totalPoints += int.TryParse(league.Points, out int points) ? points : 0;
+        if (playerData.LeagueTasks.Contains(int.TryParse(league.Id, out int taskId) ? taskId : -1))
+        {
+            totalPointsLeft += int.TryParse(league.Points, out int leftPoints) ? leftPoints : 0;
+        }
     }
 }
 
-var newState = new AppState(username, DateTime.UtcNow, playerData);
+var newState = new AppState(username, DateTime.UtcNow, playerData, selectedLocations);
 string temp = statePath + ".tmp";
 File.WriteAllText(temp, JsonSerializer.Serialize(newState, stateOptions));
 File.Move(temp, statePath, true);
@@ -125,5 +158,20 @@ Console.WriteLine($"Points left to complete: {totalPointsLeft}");
 
 public record LeaguesTable(string Id, string Area, string Name, string Task, string Requirements, string Points, string Completion);
 public record PlayerData(string Username, DateTime Timestamp, IReadOnlyList<int> LeagueTasks);
+public record AppState(string? LastUsername, DateTime LastRun, PlayerData? CachedData, List<Locations> PreviousLocations);
 
-public record AppState(string? LastUsername, DateTime LastRun, PlayerData? CachedData);
+// String enum for locations to covert numbers user entered numbers into readable locations
+public enum Locations
+{
+    General = 1,
+    Varlamore = 2,
+    Karamja = 3,
+    Asgarnia = 4,
+    Desert = 5,
+    Fremennik = 6,
+    Kandarin = 7,
+    Kourend = 8,
+    Morytania = 9,
+    Tirannwn = 10,
+    Wilderness = 11,
+}
