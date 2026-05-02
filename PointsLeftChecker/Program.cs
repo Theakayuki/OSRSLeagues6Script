@@ -133,6 +133,10 @@ else
     }
 }
 
+Console.WriteLine("Any keywords to filter tasks by? For example, entering 'kill' will only show tasks with 'kill' in the description. Separate multiple keywords with commas. Or just press Enter to skip.");
+string keywordsInput = Console.ReadLine() ?? string.Empty;
+List<string> keywords = keywordsInput.Split(',').Select(k => k.Trim()).Where(k => !string.IsNullOrEmpty(k)).ToList();
+
 int totalPoints = 0;
 int totalPointsLeft = 0;
 
@@ -141,9 +145,17 @@ foreach (var league in leaguesTables)
     if (selectedLocations.Contains(Enum.Parse<Locations>(league.Area)))
     {
         totalPoints += int.TryParse(league.Points, out int points) ? points : 0;
-        if (playerData.LeagueTasks.Contains(int.TryParse(league.Id, out int taskId) ? taskId : -1))
+        if (!playerData.LeagueTasks.Contains(int.TryParse(league.Id, out int taskId) ? taskId : -1))
         {
-            totalPointsLeft += int.TryParse(league.Points, out int leftPoints) ? leftPoints : 0;
+            if (keywords.Count == 0 || keywords.Any(k => league.Task.Contains(k, StringComparison.OrdinalIgnoreCase) || league.Requirements.Contains(k, StringComparison.OrdinalIgnoreCase)))
+            {
+                totalPointsLeft += int.TryParse(league.Points, out int leftPoints) ? leftPoints : 0;
+                Console.WriteLine($"Task: {league.Task}");
+                Console.WriteLine($"Area: {league.Area}");
+                Console.WriteLine($"Points: {league.Points}");
+                Console.WriteLine($"Requirements: {league.Requirements}");
+                Console.WriteLine();
+            }
         }
     }
 }
@@ -157,6 +169,12 @@ Console.WriteLine($"Total points available: {totalPoints}");
 Console.WriteLine($"Points left to complete: {totalPointsLeft}");
 
 public record LeaguesTable(string Id, string Area, string Name, string Task, string Requirements, string Points, string Completion);
+/// <summary>
+/// Represents the player data fetched from the RuneLite API, including username, timestamp of data retrieval, and a list of completed league task IDs.
+/// </summary>
+/// <param name="Username">The username of the player.</param>
+/// <param name="Timestamp">The timestamp when the data was retrieved.</param>
+/// <param name="LeagueTasks">A list of completed league task IDs.</param>
 public record PlayerData(string Username, DateTime Timestamp, IReadOnlyList<int> LeagueTasks);
 public record AppState(string? LastUsername, DateTime LastRun, PlayerData? CachedData, List<Locations> PreviousLocations);
 
