@@ -1,4 +1,4 @@
-using System.Net.Http.Json;
+﻿using System.Net.Http.Json;
 using System.Reflection;
 using System.Text.Json;
 using PointsLeftChecker.Models;
@@ -82,19 +82,74 @@ if (leaguesTables == null)
     return;
 }
 
+Console.WriteLine("Enter locations that you have unlocked (comma-separated, e.g. General, Varlamore, Karamja)");
+Console.WriteLine("Available locations: 1. General, 2. Varlamore, 3. Karamja, 4. Asgarnia, 5. Desert, 6. Fremennik, 7. Kandarin, 8. Kourend, 9. Morytania, 10. Tirannwn, 11. Wilderness");
+if (!string.IsNullOrWhiteSpace(state?.LastLocations))
+{
+    Console.WriteLine($"Press Enter to use previous locations: {state.LastLocations}");    
+}
+
+var locationsInput = Console.ReadLine();
+
+if (string.IsNullOrWhiteSpace(locationsInput) && !string.IsNullOrWhiteSpace(state?.LastLocations))
+{
+    locationsInput = state.LastLocations;
+}
+
+List<string> unlockedLocations = new();
+if (!string.IsNullOrWhiteSpace(locationsInput))
+{
+    var locationParts = locationsInput.Split(',', StringSplitOptions.RemoveEmptyEntries);
+    foreach (var part in locationParts)
+    {
+        var trimmed = part.Trim();
+        if (Enum.TryParse<Locations>(trimmed, true, out var location))
+        {
+            unlockedLocations.Add(location.ToString());
+        }
+        else
+        {
+            Console.WriteLine($"Warning: '{trimmed}' is not a valid location and will be ignored.");
+        }
+    }
+}
+
+Console.WriteLine("Any keywords to filter the tasks? (comma-separated)");
+var keywordsInput = Console.ReadLine();
+List<string> keywords = new();
+
+if (!string.IsNullOrWhiteSpace(keywordsInput))
+{
+    var keywordParts = keywordsInput.Split(',', StringSplitOptions.RemoveEmptyEntries);
+    foreach (var part in keywordParts)
+    {
+        var trimmed = part.Trim();
+        if (!string.IsNullOrEmpty(trimmed))
+        {
+            keywords.Add(trimmed.ToLower());
+        }
+    }
+}
+
 int totalPoints = 0;
 int totalPointsLeft = 0;
 
 foreach (var league in leaguesTables)
 {
-    totalPoints += int.TryParse(league.Points, out int points) ? points : 0;
-    if (playerData.LeagueTasks.Contains(int.TryParse(league.Id, out int taskId) ? taskId : -1))
+    if (unlockedLocations.Contains(league.Area))
     {
-        totalPointsLeft += int.TryParse(league.Points, out int leftPoints) ? leftPoints : 0;
+        totalPoints += int.TryParse(league.Points, out int points) ? points : 0;
+        if (!playerData.LeagueTasks.Contains(int.TryParse(league.Id, out int taskId) ? taskId : -1))
+        {
+            if (keywords.Count == 0 || keywords.Any(k => league.Task.ToLower().Contains(k)))
+            {
+                totalPointsLeft += int.TryParse(league.Points, out int pointsLeft) ? pointsLeft : 0;
+            }
+        }
     }
 }
 
-var newState = new AppState(username, DateTime.UtcNow, playerData);
+var newState = new AppState(username, DateTime.UtcNow, playerData, locationsInput);
 try
 {
     await stateStore.SaveAsync(newState);
